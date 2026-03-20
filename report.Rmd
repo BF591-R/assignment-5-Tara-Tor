@@ -165,8 +165,8 @@ sets file.
 #first load in the id2gene.txt appropriately
 #add a new column in your labeled results that matches IDs to symbols
 #generate a named vector of symbols and log2FC values in descending order
-rnk_list <- make_ranked_log2fc(results_labeled, 'data/id2gene.txt')
-
+res_for_rnk <- results(dds) %>% as_tibble(rownames='genes')
+rnk_list <- make_ranked_log2fc(res_for_rnk, 'data/id2gene.txt')
 ```
 
 ```{r, this is the "top" of our ranked list}
