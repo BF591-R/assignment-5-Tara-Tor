@@ -13,6 +13,12 @@ start, and check that each step is working as expected before moving on.
 Use this block to source your `main.R`.
 
 ```{r setup, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(SummarizedExperiment)
+library(DESeq2)
+library(biomaRt)
+library(testthat)
+library(fgsea)
 source('main.R')
 ```
 
