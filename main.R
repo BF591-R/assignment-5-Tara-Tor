@@ -26,10 +26,11 @@ make_se <- function(counts_csv, metafile_csv, selected_times) {
     as.matrix()
   
   metadata <- read_csv(metafile_csv) %>%
+    dplyr::select(-any_of("...1")) %>%
     filter(timepoint %in% selected_times) %>%
     dplyr::select(samplename, timepoint) %>%
     mutate(timepoint = factor(timepoint, levels = c("vP0", selected_times[selected_times != "vP0"]))) %>%
-    arrange(match(samplename, colnames(counts)))
+    arrange(timepoint, samplename)
   
   counts <- counts[, metadata$samplename]
   
@@ -205,7 +206,7 @@ make_ranked_log2fc <- function(labeled_results, id2gene_path) {
     filter(!is.na(gene_symbol)) %>%
     filter(!is.na(log2FoldChange)) %>%
     group_by(gene_symbol) %>%
-    summarise(log2FoldChange = mean(log2FoldChange)) %>%
+    slice_max(abs(log2FoldChange), n = 1, with_ties = FALSE) %>%  # keep one per symbol
     ungroup()
   
   rnk_list <- setNames(merged_results$log2FoldChange, merged_results$gene_symbol)
