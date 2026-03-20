@@ -70,7 +70,7 @@ analysis (referred to as the dds in the vignette)
 #for ease of use
 Deseq2_results_list <- return_deseq_res(se, ~ timepoint)
 dds <- Deseq2_results_list$dds
-results <- Deseq2_results_list$res
+deseq_res <- Deseq2_results_list$res
 ```
 
 ## 3. Annotating results to construct a labeled volcano plot
@@ -86,7 +86,7 @@ user-defined threshold for padj and set it at .10.
 ```{r, label results tibble, echo=FALSE}
 #Label the results with the column as specified above
 #Display the summary of the tibble
-results_labeled <- label_res(results, .10)
+results_labeled <- label_res(deseq_res, .10)
 results_labeled %>% summary()
 ```
 
@@ -165,7 +165,7 @@ sets file.
 #first load in the id2gene.txt appropriately
 #add a new column in your labeled results that matches IDs to symbols
 #generate a named vector of symbols and log2FC values in descending order
-res_for_rnk <- results(dds) %>% as_tibble(rownames='genes')
+res_for_rnk <- DESeq2::results(dds) %>% as_tibble(rownames='genes')
 rnk_list <- make_ranked_log2fc(res_for_rnk, 'data/id2gene.txt')
 ```
 
