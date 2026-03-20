@@ -57,7 +57,7 @@ return_deseq_res <- function(se, design) {
   dds <- DESeqDataSet(se, design = design)
   dds$timepoint <- relevel(dds$timepoint, ref = "vP0")
   dds <- DESeq(dds)
-  res <- as.data.frame(results(dds))
+  res <- as.data.frame(DESeq2::results(dds))  # explicit namespace
   return(list(dds = dds, res = res))
 }
 
