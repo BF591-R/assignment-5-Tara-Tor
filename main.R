@@ -208,6 +208,9 @@ make_ranked_log2fc <- function(labeled_results, id2gene_path) {
     group_by(gene_symbol) %>%
     slice_max(abs(log2FoldChange), n = 1, with_ties = FALSE) %>%  # keep one per symbol
     ungroup()
+
+  merged_results <- merged_results %>%
+  filter(!duplicated(gene_symbol))  # extra safety after slice_max
   
   rnk_list <- setNames(merged_results$log2FoldChange, merged_results$gene_symbol)
   rnk_list <- sort(rnk_list, decreasing = TRUE)
@@ -227,16 +230,21 @@ make_ranked_log2fc <- function(labeled_results, id2gene_path) {
 #'
 #' @examples fgsea_results <- run_fgsea('data/m2.cp.v2023.1.Mm.symbols.gmt', rnk_list, 15, 500)
 run_fgsea <- function(gmt_file_path, rnk_list, min_size, max_size) {
-    # Read in gene sets from GMT file
-    gene_sets <- gmtPathways(gmt_file_path)
-    
-    # Run fgsea
-    fgsea_results <- fgsea(pathways = gene_sets, stats = rnk_list, minSize = min_size, maxSize = max_size)
-    
-    # Convert results to tibble
-    fgsea_results_tibble <- as_tibble(fgsea_results)
-    
-    return(fgsea_results_tibble)
+  gene_sets <- gmtPathways(gmt_file_path)
+  
+  # Safety net: remove any duplicates or NAs before passing to fgsea
+  rnk_list <- rnk_list[!is.na(names(rnk_list))]
+  rnk_list <- rnk_list[!duplicated(names(rnk_list))]
+  
+  fgsea_results <- fgsea(
+    pathways = gene_sets,
+    stats = rnk_list,
+    minSize = min_size,
+    maxSize = max_size
+  )
+  
+  fgsea_results_tibble <- as_tibble(fgsea_results)
+  return(fgsea_results_tibble)
 }
 
 #' Function to plot top ten positive NES and top ten negative NES pathways
