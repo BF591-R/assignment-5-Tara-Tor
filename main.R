@@ -21,7 +21,26 @@ library('fgsea')
 #'
 #' @examples se <- make_se('verse_counts.tsv', 'sample_metadata.csv', c('vP0', 'vAd'))
 make_se <- function(counts_csv, metafile_csv, selected_times) {
-    return(NULL)
+  # Read in counts matrix
+  counts <- read_tsv(counts_csv) %>%
+    column_to_rownames(var = "gene") %>%
+    as.matrix()
+  
+  # Read in metadata
+  metadata <- read_csv(metafile_csv) %>%
+    filter(timepoint %in% selected_times) %>%
+    mutate(timepoint = factor(timepoint, levels = c("vP0", selected_times[selected_times != "vP0"])))
+  
+  # Subset counts to only include samples in filtered metadata
+  counts <- counts[, metadata$samplename]
+  
+  # Create SummarizedExperiment object
+  se <- SummarizedExperiment(
+    assays = list(counts = counts),
+    colData = metadata
+  )
+  
+  return(se)
 }
 
 #' Function that runs DESeq2 and returns a named list containing the DESeq2
@@ -37,7 +56,16 @@ make_se <- function(counts_csv, metafile_csv, selected_times) {
 #'
 #' @examples results <- return_deseq_res(se, ~ timepoint)
 return_deseq_res <- function(se, design) {
-    return(NULL)
+    # Create DESeqDataSet object
+    dds <- DESeqDataSet(se, design = design)
+    
+    # Run DESeq2
+    dds <- DESeq(dds)
+    
+    # Get results as a dataframe
+    res <- as.data.frame(results(dds))
+    
+    return(list(dds = dds, res = res))
 }
 
 #' Function that takes the DESeq2 results dataframe, converts it to a tibble and
@@ -59,7 +87,18 @@ return_deseq_res <- function(se, design) {
 #'
 #' @examples labeled_results <- label_res(res, .10)
 label_res <- function(deseq2_res, padj_threshold) {
-    return(NULL)
+    # Convert to tibble and add gene names as a column
+    res_tibble <- as_tibble(deseq2_res, rownames = "genes")
+    
+    # Add volc_plot_status column
+    res_tibble <- res_tibble %>%
+        mutate(volc_plot_status = case_when(
+            padj < padj_threshold & log2FoldChange > 0 ~ "UP",
+            padj < padj_threshold & log2FoldChange < 0 ~ "DOWN",
+            TRUE ~ "NS"
+        ))
+    
+    return(res_tibble)
 }
 
 #' Function to plot the unadjusted p-values as a histogram
@@ -72,7 +111,10 @@ label_res <- function(deseq2_res, padj_threshold) {
 #'
 #' @examples pval_plot <- plot_pvals(labeled_results)
 plot_pvals <- function(labeled_results) {
-    return(NULL)
+    ggplot(labeled_results, aes(x = pvalue)) +
+        geom_histogram(binwidth = 0.05, fill = "blue", color = "black") +
+        labs(title = "Histogram of Raw P-values", x = "P-value", y = "Count") +
+        theme_minimal()
 }
 
 #' Function to plot the log2foldchange from DESeq2 results in a histogram
@@ -87,7 +129,10 @@ plot_pvals <- function(labeled_results) {
 #'
 #' @examples log2fc_plot <- plot_log2fc(labeled_results, .10)
 plot_log2fc <- function(labeled_results, padj_threshold) {
-    return(NULL)
+    ggplot(labeled_results %>% filter(padj < padj_threshold), aes(x = log2FoldChange)) +
+        geom_histogram(binwidth = 0.5, fill = "orange", color = "black") +
+        labs(title = "Histogram of Log2 Fold Changes (padj < 0.1)", x = "Log2 Fold Change", y = "Count") +
+        theme_minimal()
 }
 
 #' Function to make scatter plot of normalized counts for top ten genes ranked
@@ -104,8 +149,28 @@ plot_log2fc <- function(labeled_results, padj_threshold) {
 #' @export
 #'
 #' @examples norm_counts_plot <- scatter_norm_counts(labeled_results, dds, 10)
-scatter_norm_counts <- function(labeled_results, dds_obj, num_genes){
-    return(NULL)
+scatter_norm_counts <- function(labeled_results, dds_obj, num_genes) {
+  norm_counts <- counts(dds_obj, normalized = TRUE)
+  
+  top_genes <- labeled_results %>%
+    arrange(padj) %>%
+    head(num_genes) %>%
+    pull(genes)
+  
+  plot_data <- norm_counts[top_genes, ] %>%
+    as.data.frame() %>%
+    rownames_to_column(var = "genes") %>%
+    pivot_longer(-genes, names_to = "samplenames", values_to = "norm_counts")
+  
+  ggplot(plot_data, aes(x = genes, y = log10(norm_counts), color = samplenames)) +
+    geom_point(size = 3) +
+    labs(
+      title = "Plot of Log10(normalized counts) for top ten DE genes",
+      x = "",
+      y = "log10(norm_counts)"
+    ) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
 }
 
 #' Function to generate volcano plot from DESeq2 results
@@ -120,7 +185,11 @@ scatter_norm_counts <- function(labeled_results, dds_obj, num_genes){
 #' @examples volcano_plot <- plot_volcano(labeled_results)
 #' 
 plot_volcano <- function(labeled_results) {
-    return(NULL)
+    ggplot(labeled_results, aes(x = log2FoldChange, y = -log10(padj), color = volc_plot_status)) +
+        geom_point(alpha = 0.6) +
+        scale_color_manual(values = c("UP" = "red", "DOWN" = "blue", "NS" = "grey")) +
+        labs(title = "Volcano Plot", x = "Log2 Fold Change", y = "-Log10 Adjusted P-value") +
+        theme_minimal()
 }
 
 #' Function to generate a named vector ranked by log2FC descending
@@ -137,7 +206,20 @@ plot_volcano <- function(labeled_results) {
 #' @examples rnk_list <- make_ranked_log2fc(labeled_results, 'data/id2gene.txt')
 
 make_ranked_log2fc <- function(labeled_results, id2gene_path) {
-    return(NULL)
+  id2gene <- read_tsv(id2gene_path, col_names = c("ensembl_id", "gene_symbol"))
+  
+  merged_results <- labeled_results %>%
+    left_join(id2gene, by = c("genes" = "ensembl_id")) %>%
+    filter(!is.na(gene_symbol)) %>%
+    filter(!is.na(log2FoldChange)) %>%
+    group_by(gene_symbol) %>%                                    # <-- add these
+    slice_max(abs(log2FoldChange), n = 1, with_ties = FALSE) %>% # <-- two lines
+    ungroup()
+  
+  rnk_list <- setNames(merged_results$log2FoldChange, merged_results$gene_symbol)
+  rnk_list <- sort(rnk_list, decreasing = TRUE)
+  
+  return(rnk_list)
 }
 
 #' Function to run fgsea with arguments for min and max gene set size
@@ -153,7 +235,16 @@ make_ranked_log2fc <- function(labeled_results, id2gene_path) {
 #'
 #' @examples fgsea_results <- run_fgsea('data/m2.cp.v2023.1.Mm.symbols.gmt', rnk_list, 15, 500)
 run_fgsea <- function(gmt_file_path, rnk_list, min_size, max_size) {
-    return(NULL)
+    # Read in gene sets from GMT file
+    gene_sets <- gmtPathways(gmt_file_path)
+    
+    # Run fgsea
+    fgsea_results <- fgsea(pathways = gene_sets, stats = rnk_list, minSize = min_size, maxSize = max_size)
+    
+    # Convert results to tibble
+    fgsea_results_tibble <- as_tibble(fgsea_results)
+    
+    return(fgsea_results_tibble)
 }
 
 #' Function to plot top ten positive NES and top ten negative NES pathways
@@ -169,7 +260,34 @@ run_fgsea <- function(gmt_file_path, rnk_list, min_size, max_size) {
 #' @export
 #'
 #' @examples fgsea_plot <- top_pathways(fgsea_results, 10)
-top_pathways <- function(fgsea_results, num_paths){
-    return(NULL)
+top_pathways <- function(fgsea_results, num_paths) {
+  top_pos <- fgsea_results %>%
+    filter(NES > 0) %>%
+    arrange(desc(NES)) %>%
+    head(num_paths)
+  
+  top_neg <- fgsea_results %>%
+    filter(NES < 0) %>%
+    arrange(NES) %>%
+    head(num_paths)
+  
+  top_paths <- bind_rows(top_pos, top_neg) %>%
+    mutate(pathway = gsub("_", " ", pathway),
+           pathway = str_wrap(pathway, width = 40))  # wrap long labels
+  
+  ggplot(top_paths, aes(x = reorder(pathway, NES), y = NES, fill = NES > 0)) +
+    geom_bar(stat = "identity") +
+    coord_flip() +
+    scale_fill_manual(values = c("TRUE" = "red", "FALSE" = "blue"), guide = "none") +
+    labs(
+      title = "fgsea results for Hallmark MSigDB gene sets",
+      x = "Pathway",
+      y = "Normalized Enrichment Score (NES)"
+    ) +
+    theme_minimal() +
+    theme(
+      axis.text.y = element_text(size = 7),       # smaller text
+      plot.margin = margin(l = 20, r = 20, unit = "mm")  # expand margins
+    )
 }
 
