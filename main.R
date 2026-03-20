@@ -21,25 +21,22 @@ library('fgsea')
 #'
 #' @examples se <- make_se('verse_counts.tsv', 'sample_metadata.csv', c('vP0', 'vAd'))
 make_se <- function(counts_csv, metafile_csv, selected_times) {
-  # Read in counts matrix
   counts <- read_tsv(counts_csv) %>%
     column_to_rownames(var = "gene") %>%
     as.matrix()
   
-  # Read in metadata
   metadata <- read_csv(metafile_csv) %>%
     filter(timepoint %in% selected_times) %>%
-    mutate(timepoint = factor(timepoint, levels = c("vP0", selected_times[selected_times != "vP0"])))
+    dplyr::select(samplename, timepoint) %>%
+    mutate(timepoint = factor(timepoint, levels = c("vP0", selected_times[selected_times != "vP0"]))) %>%
+    arrange(match(samplename, colnames(counts)))
   
-  # Subset counts to only include samples in filtered metadata
   counts <- counts[, metadata$samplename]
   
-  # Create SummarizedExperiment object
-  se <- SummarizedExperiment(
+  se <- SummarizedExperiment::SummarizedExperiment(
     assays = list(counts = counts),
     colData = metadata
   )
-  
   return(se)
 }
 
@@ -56,16 +53,11 @@ make_se <- function(counts_csv, metafile_csv, selected_times) {
 #'
 #' @examples results <- return_deseq_res(se, ~ timepoint)
 return_deseq_res <- function(se, design) {
-    # Create DESeqDataSet object
-    dds <- DESeqDataSet(se, design = design)
-    
-    # Run DESeq2
-    dds <- DESeq(dds)
-    
-    # Get results as a dataframe
-    res <- as.data.frame(results(dds))
-    
-    return(list(dds = dds, res = res))
+  dds <- DESeqDataSet(se, design = design)
+  dds$timepoint <- relevel(dds$timepoint, ref = "vP0")
+  dds <- DESeq(dds)
+  res <- as.data.frame(results(dds))
+  return(list(dds = dds, res = res))
 }
 
 #' Function that takes the DESeq2 results dataframe, converts it to a tibble and
@@ -212,13 +204,12 @@ make_ranked_log2fc <- function(labeled_results, id2gene_path) {
     left_join(id2gene, by = c("genes" = "ensembl_id")) %>%
     filter(!is.na(gene_symbol)) %>%
     filter(!is.na(log2FoldChange)) %>%
-    group_by(gene_symbol) %>%                                    # <-- add these
-    slice_max(abs(log2FoldChange), n = 1, with_ties = FALSE) %>% # <-- two lines
+    group_by(gene_symbol) %>%
+    summarise(log2FoldChange = mean(log2FoldChange)) %>%
     ungroup()
   
   rnk_list <- setNames(merged_results$log2FoldChange, merged_results$gene_symbol)
   rnk_list <- sort(rnk_list, decreasing = TRUE)
-  
   return(rnk_list)
 }
 
