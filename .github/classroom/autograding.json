@@ -81,9 +81,9 @@
       "points": 1
     },
     {
-      "name": null,
-      "setup": "awk -F '\t' '$1 ==      please check your factor reference levels { print \"testnum:\", $1, \"\\nresult:\", $2, \"\\ntest:\", $3, \"\\nmessage:\", $4; exit}' test_results.csv",
-      "run": "awk -F '\t' '$1 ==      please check your factor reference levels { print; exit}' test_results.csv | grep -q -e 'success' -e 'warning'",
+      "name": "DESeq2 directionality check negative log2FC",
+      "setup": "awk -F '\t' '$1 == 8 { print \"testnum:\", $1, \"\\nresult:\", $2, \"\\ntest:\", $3, \"\\nmessage:\", $4; exit}' test_results.csv",
+      "run": "awk -F '\t' '$1 == 8 { print; exit}' test_results.csv | grep -q -e 'success' -e 'warning'",
       "input": "",
       "output": "",
       "comparison": "exact",
@@ -101,9 +101,9 @@
       "points": 1
     },
     {
-      "name": null,
-      "setup": "awk -F '\t' '$1 ==      please check your factor reference levels { print \"testnum:\", $1, \"\\nresult:\", $2, \"\\ntest:\", $3, \"\\nmessage:\", $4; exit}' test_results.csv",
-      "run": "awk -F '\t' '$1 ==      please check your factor reference levels { print; exit}' test_results.csv | grep -q -e 'success' -e 'warning'",
+      "name": "DESeq2 directionality check positive log2FC",
+      "setup": "awk -F '\t' '$1 == 9 { print \"testnum:\", $1, \"\\nresult:\", $2, \"\\ntest:\", $3, \"\\nmessage:\", $4; exit}' test_results.csv",
+      "run": "awk -F '\t' '$1 == 9 { print; exit}' test_results.csv | grep -q -e 'success' -e 'warning'",
       "input": "",
       "output": "",
       "comparison": "exact",
